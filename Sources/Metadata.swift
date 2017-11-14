@@ -1,4 +1,3 @@
-import ObjectMapper
 
 public struct Metadata {
 
@@ -16,42 +15,65 @@ public struct Metadata {
 
     /// Used to restrict the schema to a specific set of values.
     public let enumeratedValues: [Any?]?
+    
+    /// Whether or not the schema can be nil. Corresponds to `x-nullable`.
+    public let nullable: Bool
+    
+    /// An example value for the schema.
+    public let example: Any?
 }
 
-struct MetadataBuilder: Builder {
-
-    typealias Building = Metadata
+struct MetadataBuilder: Codable {
     let type: DataType
     let title: String?
     let description: String?
     let defaultValue: Any?
     let enumeratedValues: [Any?]?
+    let nullable: Bool
+    let example: Any?
 
-    init(map: Map) throws {
-        if let typeString: String = try? map.value("type"), let mappedType = DataType(rawValue: typeString) {
-            type = mappedType
-        } else if map.JSON["items"] != nil {
-            // Implicit array
-            type = .array
-        } else if map.JSON["properties"] != nil {
-            // Implicit object
-            type = .object
-        } else if map.JSON["enum"] != nil {
-            type = .enumeration
-        } else if map.JSON["allOf"] != nil {
-            type = .allOf
-        } else {
-            throw DecodingError()
-        }
-
-        title = try? map.value("title")
-        description = try? map.value("description")
-        defaultValue = try? map.value("default")
-        enumeratedValues = try? map.value("enum")
+    enum CodingKeys: String, CodingKey {
+        case title
+        case description
+        case defaultValue = "default"
+        case enumeratedValues = "enum"
+        case nullable = "x-nullable"
+        case example
     }
 
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try DataType(from: decoder)
+        self.title = try values.decodeIfPresent(String.self, forKey: .title)
+        self.description = try values.decodeIfPresent(String.self, forKey: .description)
+        self.defaultValue = try values.decodeAnyIfPresent(forKey: .defaultValue)
+        self.enumeratedValues = try values.decodeArrayOfOptionalAnyIfPresent(forKey: .enumeratedValues)
+        self.nullable = try values.decodeIfPresent(Bool.self, forKey: .nullable) ?? false
+        self.example = try values.decodeAnyIfPresent(forKey: .example)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.title, forKey: .title)
+        try container.encode(self.description, forKey: .description)
+        try container.encodeAnyIfPresent(self.defaultValue, forKey: .defaultValue)
+        try container.encodeArrayOfOptionalAnyIfPresent(self.enumeratedValues, forKey: .enumeratedValues)
+        try container.encode(self.nullable, forKey: .nullable)
+        try container.encodeAnyIfPresent(self.example, forKey: .example)
+    }
+}
+
+extension MetadataBuilder: Builder {
+    typealias Building = Metadata
+
     func build(_ swagger: SwaggerBuilder) throws -> Metadata {
-        return Metadata(type: self.type, title: self.title, description: self.description,
-                        defaultValue: self.defaultValue, enumeratedValues: self.enumeratedValues)
+        return Metadata(
+            type: self.type,
+            title: self.title,
+            description: self.description,
+            defaultValue: self.defaultValue,
+            enumeratedValues: self.enumeratedValues,
+            nullable: self.nullable,
+            example: self.example)
     }
 }

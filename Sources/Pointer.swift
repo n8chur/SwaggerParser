@@ -1,10 +1,8 @@
-import ObjectMapper
 
-public struct Pointer<T: ImmutableMappable>: ImmutableMappable {
+struct Pointer<T: Codable>: Codable {
+    let path: String
 
-    public let path: String
-
-    public init(map: Map) throws {
-        path = try map.value("$ref")
+    enum CodingKeys: String, CodingKey {
+        case path = "$ref"
     }
 }

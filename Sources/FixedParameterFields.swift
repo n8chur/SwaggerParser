@@ -1,14 +1,6 @@
-import ObjectMapper
-
-public enum ParameterLocation: String {
-    case query = "query"
-    case header = "header"
-    case path = "path"
-    case formData = "formData"
-    case body = "body"
-}
 
 public struct FixedParameterFields {
+
     /// The name of the parameter. Parameter names are case sensitive.
     /// If in is "path", the name field MUST correspond to the associated path segment from the path
     /// field in the Paths Object.
@@ -23,25 +15,42 @@ public struct FixedParameterFields {
     /// Determines whether this parameter is mandatory. If the parameter is in "path", this property is
     /// required and its value MUST be true. Its default value is false.
     public let required: Bool
+    
+    /// An example value for the parameter.
+    public let example: Any?
 }
 
-struct FixedParameterFieldsBuilder: Builder {
-
-    typealias Building = FixedParameterFields
+struct FixedParameterFieldsBuilder: Codable {
     let name: String
     let location: ParameterLocation
     let description: String?
     let required: Bool
+    let example: String?
 
-    init(map: Map) throws {
-        name = try map.value("name")
-        location = try map.value("in")
-        description = try? map.value("description")
-        required = (try? map.value("required")) ?? false
+    enum CodingKeys: String, CodingKey {
+        case name
+        case location = "in"
+        case description
+        case required
+        case example = "x-example"
     }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try values.decode(String.self, forKey: .name)
+        self.location = try values.decode(ParameterLocation.self, forKey: .location)
+        self.description = try? values.decode(String.self, forKey: .description)
+        self.required = (try values.decodeIfPresent(Bool.self, forKey: .required)) ?? false
+        self.example = try? values.decode(String.self, forKey: .example)
+        // TODO: Decode example as any.
+    }
+}
+
+extension FixedParameterFieldsBuilder: Builder {
+    typealias Building = FixedParameterFields
 
     func build(_ swagger: SwaggerBuilder) throws -> FixedParameterFields {
         return FixedParameterFields(name: self.name, location: self.location, description: self.description,
-                                    required: self.required)
+                                    required: self.required, example: self.example)
     }
 }

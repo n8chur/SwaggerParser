@@ -1,24 +1,36 @@
-import Foundation
 
-public enum StringFormat: String {
-
-    /// Base64 encoded characters
-    case byte
-
-    /// Any sequence of octets
-    case binary
-
-    /// As defined by full-date - RFC3339
-    case date
-
-    /// As defined by date-time - RFC3339
-    case dateTime = "date-time"
-
-    /// Used to hint UIs the input needs to be obscured.
-    case password
+public enum ParameterLocation: String, Codable {
+    case query
+    case header
+    case path
+    case formData
+    case body
 }
 
-public enum IntegerFormat: String {
+public enum OAuth2Flow: String, Codable {
+    case implicit
+    case password
+    case application
+    case accessCode
+}
+
+public enum APIKeyLocation: String, Codable {
+    case query
+    case header
+}
+
+/// The HTTP verb corresponding to the operation's type.
+public enum OperationType: String, Codable {
+    case get
+    case put
+    case post
+    case delete
+    case options
+    case head
+    case patch
+}
+
+public enum IntegerFormat: String, Codable {
 
     /// Signed 32 bits
     case int32
@@ -27,44 +39,96 @@ public enum IntegerFormat: String {
     case int64
 }
 
-public enum NumberFormat: String {
+/// Floating point number format.
+public enum NumberFormat: String, Codable {
+
+    /// Single precision
     case float
     case double
 }
 
-public enum DataType: String {
-    case array = "array"
-    case object = "object"
-    case string = "string"
-    case number = "number"
-    case integer = "integer"
-    case enumeration = "enumeration"
-    case boolean = "boolean"
-    case allOf = "allOf"
+public enum CollectionFormat: String, Codable {
+
+    /// Comma separated values. Default. E.g. "thingOne,thingTwo"
+    case csv
+
+    /// Space separated values. E.g. "thingOne thingTwo"
+    case ssv
+
+    /// Tab separated values. E.g. "thingOne\tthingTwo"
+    case tsv
+
+    /// Pipe separated values. E.g. "thingOne|thingTwo"
+    case pipes
+
+    /// Corresponds to multiple parameter instances instead of multiple values for a single instance
+    /// foo=bar&foo=baz. This is valid only for parameters in "query" or "formData".
+    case multi
 }
 
-public enum SimpleDataType: String {
-    case string = "string"
-    case number = "number"
-    case integer = "integer"
-    case boolean = "boolean"
-    case array = "array"
-    case file = "file"
+public enum TransferScheme: String, Codable {
+    case http
+    case https
+    case ws
+    case wss
 }
 
-public enum CollectionFormat: String {
-    case csv = "csv"
-    case ssv = "ssv"
-    case tsv = "tsv"
-    case pipes = "pipes"
+/// Enumerates possible data types for Items or Schema specifications.
+public enum DataType: String, Codable {
+    case array
+    case object
+    case string
+    case number
+    case integer
+    case boolean
+    case file
+    case null
 
-    /// multi - corresponds to multiple parameter instances instead of multiple values for a single instance foo=bar&foo=baz.
-    /// This is valid only for parameters in "query" or "formData".
-}
+    case enumeration
+    case allOf
+    case pointer
+    case any
 
-public enum TransferScheme: String {
-    case http = "http"
-    case https = "https"
-    case ws = "ws"
-    case wss = "wss"
+    enum CodingKeys: String, CodingKey {
+        case type = "type"
+        case reference = "$ref"
+        case items = "items"
+        case properties = "properties"
+        case enumeration = "enum"
+        case allOf = "allOf"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        if let typeString = try? values.decode(String.self, forKey: .type) {
+            guard let dataType = DataType(rawValue: typeString) else {
+                throw DecodingError("Unknown data type \(typeString)")
+            }
+
+            self = dataType
+        } else if values.contains(.reference) {
+            self = .pointer
+        } else if values.contains(.items) {
+            self = .array
+        } else if values.contains(.properties) {
+            self = .object
+        } else if values.contains(.enumeration) {
+            self = .enumeration
+        } else if values.contains(.allOf) {
+            self = .allOf
+        } else {
+            self = .any
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .array, .object, .string, .number, .integer, .boolean, .file, .null:
+            try container.encode(self.rawValue, forKey: .type)
+        default:
+            // Other types are inferred and will be encoded by their respective objects.
+            break
+        }
+    }
 }

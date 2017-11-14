@@ -1,48 +1,47 @@
-import ObjectMapper
 
 public struct ArrayItem {
-    public let metadata: Metadata
+
+    /// Metadata about the array type including the number of items and their uniqueness.
+    public let metadata: ArrayMetadata
 
     /// Describes the type of items in the array.
     public let items: Items
 
-    /// Determines the format of the array if type array is used.
+    /// Determines the format of the array if type array is used. Possible values are:
+    /// csv - comma separated values foo,bar.
+    /// ssv - space separated values foo bar.
+    /// tsv - tab separated values foo\tbar.
+    /// pipes - pipe separated values foo|bar.
+    /// Default value is csv.
     public let collectionFormat: CollectionFormat
-
-    /// Must be greater than or equal to zero.
-    public let maxItems: Int?
-
-    /// Must be greater than or equal to zero.
-    public let minItems: Int
-
-    public let uniqueItems: Bool
 }
 
-struct ArrayItemBuilder: Builder {
-
-    typealias Building = ArrayItem
-
-    let metadata: MetadataBuilder
-    let items: ItemsBuilder
-
+struct ArrayItemBuilder: Codable {
+    let metadataBuilder: ArrayMetadataBuilder
+    let itemsBuilder: ItemsBuilder
     let collectionFormat: CollectionFormat
-    let maxItems: Int?
-    let minItems: Int
-    let uniqueItems: Bool
 
-    init(map: Map) throws {
-        metadata = try MetadataBuilder(map: map)
-        items = try map.value("items")
-        collectionFormat = (try? map.value("collectionFormat")) ?? .csv
-
-        maxItems = try? map.value("maxItems")
-        minItems = (try? map.value("minItems")) ?? 0
-        uniqueItems = (try? map.value("uniqueItems")) ?? false
+    enum CodingKeys: String, CodingKey {
+        case itemsBuilder = "items"
+        case collectionFormat
     }
 
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.metadataBuilder = try ArrayMetadataBuilder(from: decoder)
+        self.itemsBuilder = try values.decode(ItemsBuilder.self, forKey: .itemsBuilder)
+        self.collectionFormat = try values.decodeIfPresent(CollectionFormat.self,
+                                                           forKey: .collectionFormat) ?? .csv
+    }
+}
+
+extension ArrayItemBuilder: Builder {
+    typealias Building = ArrayItem
+
     func build(_ swagger: SwaggerBuilder) throws -> ArrayItem {
-        return ArrayItem(metadata: try self.metadata.build(swagger), items: try self.items.build(swagger),
-                         collectionFormat: self.collectionFormat, maxItems: self.maxItems,
-                         minItems: self.minItems, uniqueItems: self.uniqueItems)
+        return ArrayItem(
+            metadata: try self.metadataBuilder.build(swagger),
+            items: try self.itemsBuilder.build(swagger),
+            collectionFormat: self.collectionFormat)
     }
 }

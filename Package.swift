@@ -1,10 +1,27 @@
-// swift-tools-version:3.1
+// swift-tools-version:4.0
 
 import PackageDescription
 
 let package = Package(
     name: "SwaggerParser",
-    dependencies: [
-        .Package(url: "https://github.com/Hearst-DD/ObjectMapper.git", majorVersion: 2)
+    products: [
+        .library(
+            name: "SwaggerParser",
+            type: .static,
+            targets: ["SwaggerParser"]
+        ),
+    ],
+    dependencies: [],
+    targets: [
+        .target(
+            name: "SwaggerParser",
+            dependencies: [],
+            path: "Sources"
+        ),
+        .testTarget(
+            name: "SwaggerParserTests",
+            dependencies: [],
+            path: "Tests"
+        ),
     ]
 )

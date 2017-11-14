@@ -1,30 +1,48 @@
-import ObjectMapper
+// TODO: Handle files & allow empty value.
 
-/// Describes a single operation parameter. Parameters can be passed in:
-/// Path, Query, Header, Body, Form
+/// Describes a single operation parameter. 
+/// Parameters can be passed either the body of the request or 'other':
+/// Path, Query, Header, or Form
 public enum Parameter {
     case body(fixedFields: FixedParameterFields, schema: Schema)
-    // TODO: Handle files & allow empty value.
     case other(fixedFields: FixedParameterFields, items: Items)
 }
 
-enum ParameterBuilder: Builder {
-
-    typealias Building = Parameter
-
-    // TODO: Handle files & allow empty value.
+enum ParameterBuilder: Codable {
     case body(fixedFieldsBuilder: FixedParameterFieldsBuilder, schemaBuilder: SchemaBuilder)
     case other(fixedFieldsBuilder: FixedParameterFieldsBuilder, itemsBuilder: ItemsBuilder)
 
-    init(map: Map) throws {
-        let fixedFields = try FixedParameterFieldsBuilder(map: map)
+    enum CodingKeys: String, CodingKey {
+        case schema
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let fixedFields = try FixedParameterFieldsBuilder(from: decoder)
         switch fixedFields.location {
         case .body:
-            self = .body(fixedFieldsBuilder: fixedFields, schemaBuilder: try map.value("schema"))
+            let schema = try values.decode(SchemaBuilder.self, forKey: .schema)
+            self = .body(fixedFieldsBuilder: fixedFields, schemaBuilder: schema)
         case .query, .header, .path, .formData:
-            self = .other(fixedFieldsBuilder: fixedFields, itemsBuilder: try ItemsBuilder(map: map))
+            self = .other(fixedFieldsBuilder: fixedFields, itemsBuilder: try ItemsBuilder(from: decoder))
         }
     }
+
+    func encode(to encoder: Encoder) throws {
+        switch self {
+        case .body(let fixedFieldsBuilder, let schemaBuilder):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try fixedFieldsBuilder.encode(to: encoder)
+            try container.encode(schemaBuilder, forKey: .schema)
+        case .other(let fixedFieldsBuilder, let itemsBuilder):
+            try fixedFieldsBuilder.encode(to: encoder)
+            try itemsBuilder.encode(to: encoder)
+        }
+    }
+}
+
+extension ParameterBuilder: Builder {
+    typealias Building = Parameter
 
     func build(_ swagger: SwaggerBuilder) throws -> Parameter {
         switch self {
@@ -44,16 +62,7 @@ extension ParameterBuilder {
     {
         switch reference {
         case .pointer(let pointer):
-            let components = pointer.path.components(separatedBy: "/")
-            guard components.count == 3 && components[0] == "#" && components[1] == "parameters",
-                let builder = swagger.parameters[components[2]] else
-            {
-                throw DecodingError()
-            }
-
-            let name = components[2]
-            let parameter = try builder.build(swagger)
-            return .b(Structure(name: name, structure: parameter))
+            return .b(try self.resolver.resolve(swagger, pointer: pointer))
         case .value(let builder):
             return .a(try builder.build(swagger))
         }

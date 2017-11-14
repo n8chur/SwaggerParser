@@ -1,4 +1,3 @@
-import ObjectMapper
 
 public struct Response {
 
@@ -12,25 +11,36 @@ public struct Response {
     /// Lists the headers that can be sent as part of a response.
     /// The name of the property corresponds to the name of the header. 
     /// The value describes the type of the header.
-    public let headers: [String : Items]
+    public let headers: [String: Items]
 }
 
-struct ResponseBuilder: Builder {
-
-    typealias Building = Response
+struct ResponseBuilder: Codable {
     let description: String
-    let schema: SchemaBuilder?
-    let headers: [String : ItemsBuilder]
+    let schemaBuilder: SchemaBuilder?
+    let headerBuilders: [String: ItemsBuilder]
 
-    init(map: Map) throws {
-        description = try map.value("description")
-        schema = try? map.value("schema")
-        headers = (try? map.value("headers")) ?? [:]
+    enum CodingKeys: String, CodingKey {
+        case description
+        case schemaBuilder = "schema"
+        case headerBuilders = "headers"
     }
 
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.description = try values.decode(String.self, forKey: .description)
+        self.schemaBuilder = try values.decodeIfPresent(SchemaBuilder.self, forKey: .schemaBuilder)
+        self.headerBuilders = try values.decodeIfPresent([String : ItemsBuilder].self,
+                                                         forKey: .headerBuilders) ?? [:]
+    }
+}
+
+extension ResponseBuilder: Builder {
+    typealias Building = Response
+
     func build(_ swagger: SwaggerBuilder) throws -> Response {
-        let headers = try Dictionary(self.headers.map { ($0, try $1.build(swagger)) })
-        return Response(description: self.description, schema: try self.schema?.build(swagger),
+        let headers = try self.headerBuilders.mapValues { try $0.build(swagger) }
+        return Response(description: self.description,
+                        schema: try self.schemaBuilder?.build(swagger),
                         headers: headers)
     }
 }
@@ -41,16 +51,7 @@ extension ResponseBuilder {
     {
         switch reference {
         case .pointer(let pointer):
-            let components = pointer.path.components(separatedBy: "/")
-            guard components.count == 3 && components[0] == "#" && components[1] == "responses",
-                let builder = swagger.responses[components[2]] else
-            {
-                throw DecodingError()
-            }
-
-            let name = components[2]
-            let response = try builder.build(swagger)
-            return .b(Structure(name: name, structure: response))
+            return .b(try self.resolver.resolve(swagger, pointer: pointer))
         case .value(let builder):
             return .a(try builder.build(swagger))
         }
