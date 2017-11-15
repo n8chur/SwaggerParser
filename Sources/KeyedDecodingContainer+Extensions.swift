@@ -6,7 +6,13 @@ extension KeyedDecodingContainer {
             { try self.decode(String.self, forKey: key) },
             { try self.decode(Bool.self, forKey: key) },
             { try self.decode(Int.self, forKey: key) },
-            { try self.decode(Double.self, forKey: key) }
+            { try self.decode(Double.self, forKey: key) },
+            // TODO: Find a more compete solution for supporting arbitrary
+            // Decodable dictionaries
+            { try self.decode([String: String].self, forKey: key) },
+            { try self.decode([String: Bool].self, forKey: key) },
+            { try self.decode([String: Int].self, forKey: key) },
+            { try self.decode([String: Double].self, forKey: key) },
         ]
     }
 
@@ -15,7 +21,13 @@ extension KeyedDecodingContainer {
             { try self.decode([String].self, forKey: key) },
             { try self.decode([Bool].self, forKey: key) },
             { try self.decode([Int].self, forKey: key) },
-            { try self.decode([Double].self, forKey: key) }
+            { try self.decode([Double].self, forKey: key) },
+            // TODO: Find a more compete solution for supporting arbitrary
+            // Decodable dictionaries
+            { try self.decode([[String: String]].self, forKey: key) },
+            { try self.decode([[String: Bool]].self, forKey: key) },
+            { try self.decode([[String: Int]].self, forKey: key) },
+            { try self.decode([[String: Double]].self, forKey: key) },
         ]
     }
 
@@ -24,7 +36,13 @@ extension KeyedDecodingContainer {
             { try self.decode([String?].self, forKey: key) },
             { try self.decode([Bool?].self, forKey: key) },
             { try self.decode([Int?].self, forKey: key) },
-            { try self.decode([Double?].self, forKey: key) }
+            { try self.decode([Double?].self, forKey: key) },
+            // TODO: Find a more compete solution for supporting arbitrary
+            // Decodable dictionaries
+            { try self.decode([[String: String]?].self, forKey: key) },
+            { try self.decode([[String: Bool]?].self, forKey: key) },
+            { try self.decode([[String: Int]?].self, forKey: key) },
+            { try self.decode([[String: Double]?].self, forKey: key) },
         ]
     }
 
