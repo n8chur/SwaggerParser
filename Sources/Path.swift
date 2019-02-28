@@ -11,6 +11,8 @@ public struct Path {
     public let parameters: [Either<Parameter, Structure<Parameter>>]
 }
 
+extension OperationType: CodingKey { }
+
 struct PathBuilder: Codable {
     let operations: [OperationType: OperationBuilder]
     let parameters: [Reference<ParameterBuilder>]
@@ -21,16 +23,14 @@ struct PathBuilder: Codable {
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        let operations = try [String: OperationBuilder](from: decoder)
-        let operationTuples = operations.compactMap { tuple -> (OperationType, OperationBuilder)? in
-            guard let type = OperationType(rawValue: tuple.key) else {
-                return nil
+        let operationValues = try decoder.container(keyedBy: OperationType.self)
+        self.operations = try OperationType.allCases.reduce(into: Dictionary<OperationType, OperationBuilder>()) { (operations, type) in
+            guard let value = try operationValues.decodeIfPresent(OperationBuilder.self, forKey: type) else {
+                return
             }
 
-            return (type, tuple.value)
+            operations[type] = value
         }
-
-        self.operations = Dictionary(uniqueKeysWithValues: operationTuples)
         self.parameters = try values.decodeIfPresent([Reference<ParameterBuilder>].self,
                                                      forKey: .parameters) ?? []
     }
