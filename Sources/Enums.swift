@@ -20,7 +20,7 @@ public enum APIKeyLocation: String, Codable {
 }
 
 /// The HTTP verb corresponding to the operation's type.
-public enum OperationType: String, Codable {
+public enum OperationType: String, CaseIterable, Codable {
     case get
     case put
     case post
